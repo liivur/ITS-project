@@ -107,11 +107,8 @@ def get_path(weights):
 
 
 def get_path_from_addresses(addresses):
-    if len(addresses) == 0:
+    if len(addresses) < 3:
         return 0, []
-
-    if len(addresses) == 1:
-        return 0, [0]
 
     distance_matrix = gmaps.distance_matrix(origins=addresses, destinations=addresses)
     adj = [list(map(lambda x: x['duration']['value'], row['elements'])) for row in distance_matrix['rows']]
@@ -123,20 +120,35 @@ def get_coords(address):
     return geocode[0]['geometry']['location']['lat'], geocode[0]['geometry']['location']['lng']
 
 
+def get_flat_addresses(addresses):
+    flat = []
+    for address in addresses:
+        flat.append(address[0])
+        flat.append(address[1])
+
+    return flat
+
+
 gmaps = googlemaps.Client(key='AIzaSyCg2zb5Hlx6LNU0zaJw9vg98WvUv7JoZCw')
 
 app = Flask(__name__)
-saved_addresses = []
+saved_addresses = {
+    ('Mõisavahe 2, Tartu, Estonia', 'Kastani 15, Tartu, Estonia'),
+    ('Näituse 15, Tartu, Estonia', 'Kastani 15, Tartu, Estonia'),
+}
 
 
 @app.route('/path', methods=['GET'])
 @cross_origin()
 def api_get_path():
-    address = request.args.get('address', '')
+    start = request.args.get('from', '')
+    end = request.args.get('to', '')
 
-    addresses = saved_addresses[:]
-    if address != '':
-        addresses.append(address)
+    # TODO: add proper handling for from and to
+    addresses = get_flat_addresses(saved_addresses)
+    if start and end:
+        addresses.append(start)
+        addresses.append(end)
 
     result, path = get_path_from_addresses(addresses)
 
@@ -157,14 +169,15 @@ def api_get_path():
 @cross_origin()
 def api_save_path():
     # addresses = request.args.getlist('addresses')
-    address = request.form.get('address', '')
+    start = request.form.get('from', '')
+    end = request.form.get('to', '')
 
-    if address == '':
-        return "Error: No address field provided. Please specify an address."
+    if not (start and end):
+        return "Error: No path field provided. Please specify an path."
 
-    saved_addresses.append(address)
+    saved_addresses.add((start, end))
 
-    return jsonify(True)
+    return jsonify(list(saved_addresses))
 
 
 app.run()

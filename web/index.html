@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 	<head>
-		<title>Simple Polylines</title>
+		<title>ITS project</title>
 		<script src="https://polyfill.io/v3/polyfill.min.js?features=default"></script>
 		<script
 			src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCg2zb5Hlx6LNU0zaJw9vg98WvUv7JoZCw&v=weekly"
@@ -14,7 +14,18 @@
 	<body>
 		<div id="map"></div>
 		<div class="input-container">
-			<input type="text" class="js-address" name="address">
+			<label>
+				From/to
+				<button class="js-toggle-from-to">Select from</button>
+			</label>
+			<label>
+				From: 
+				<input type="text" class="js-address-from" name="from">
+			</label>
+			<label>
+				To:
+				<input type="text" class="js-address-to" name="to">
+			</label>
 			<button class="js-check-path">Check path</button>
 			<button class="js-save-path">Save path</button>
 		</div>
