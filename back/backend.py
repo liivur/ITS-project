@@ -1,4 +1,4 @@
-from flask import Flask, escape, jsonify, request
+from flask import Flask, escape, jsonify, request, render_template
 import googlemaps
 import math
 from flask_cors import CORS, cross_origin
@@ -137,12 +137,18 @@ saved_addresses = {
     ('Näituse 15, Tartu, Estonia', 'Kastani 15, Tartu, Estonia'),
 }
 
+@app.route('/')
+def index():
+    return render_template('index.html')
+
 
 @app.route('/path', methods=['GET'])
 @cross_origin()
 def api_get_path():
     start = request.args.get('from', '')
     end = request.args.get('to', '')
+
+    print("path from %s to %s" % (start, end))
 
     # TODO: add proper handling for from and to
     addresses = get_flat_addresses(saved_addresses)
@@ -172,6 +178,7 @@ def api_save_path():
     start = request.form.get('from', '')
     end = request.form.get('to', '')
 
+    print("saving path from %s to %s" %(start, end))
     if not (start and end):
         return "Error: No path field provided. Please specify an path."
 
