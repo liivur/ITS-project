@@ -200,22 +200,28 @@ def api_get_path_google():
     start_time = time.time()
     direction = gmaps.directions(origin=locations[0], destination=locations[0], waypoints=locations[1:],
                                  optimize_waypoints=True, mode="driving", alternatives=False)
-    print('received direction in ', (time.time() - start_time), ' s:', direction)
+    time_taken = time.time() - start_time
+    print('received direction in ', time_taken, ' s:', direction)
     print("path distance: ", direction[0]['legs'][0]['distance']['value'])
 
     path_distance = 0
+
     path = []
     first = True
     for leg in direction[0]['legs']:
         path_distance += leg['distance']['value']
         if first:
-            path.append((leg['start_location']['lat'], leg['start_location']['lng']))
+            # path.append((leg['start_location']['lat'], leg['start_location']['lng']))
+            path.append({"location": {"lat": leg['start_location']['lat'], "lng": leg['start_location']['lng']}})
+            # path.append({"location": {"lat": locations[i][0], "lng": locations[i][1]}})
             first = False
-        path.append((leg['end_location']['lat'], leg['end_location']['lng']))
+        path.append({"location": {"lat": leg['end_location']['lat'], "lng": leg['end_location']['lng']}})
+        # path.append((leg['end_location']['lat'], leg['end_location']['lng']))
     print("constructed path: ", path)
+    responseDict = {"path": path, "distance": path_distance, "time": time_taken}
 
     print("overall distance=", path_distance)
-    return jsonify(path)
+    return jsonify(responseDict)
 
 
 @app.route('/path_coord_nn')
@@ -227,7 +233,9 @@ def api_get_path_coord_nn():
     for start, end in persisted_locations:
         locations.append(start)
         locations.append(end)
+    start_time = time.time()
     coord_distances = nn.calc_coord_distances(locations)
+    time_taken = time.time() - start_time
 
     print("coord distances: ", coord_distances)
     path_indices, distance = nn.nearest_neighbor(0, coord_distances)
@@ -236,11 +244,13 @@ def api_get_path_coord_nn():
     print("returning path: ", path_indices)
 
     path = []
-    for i in path_indices:
-        path.append(locations[i])
-    print("constructed path")
 
-    return jsonify(path)
+    for i in path_indices:
+        path.append({"location": {"lat": locations[i][0], "lng": locations[i][1]}})
+    print("constructed path")
+    responseDict = {"path": path, "distance": distance, "time": time_taken}
+
+    return jsonify(responseDict)
 
 
 # =========== LOCATIONS APIS ===========
