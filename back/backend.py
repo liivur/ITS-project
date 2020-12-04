@@ -2,7 +2,8 @@ from flask import Flask, escape, jsonify, request, render_template
 import googlemaps
 import math
 from flask_cors import CORS, cross_origin
-import numpy as np
+import time
+import coord_based_nn as nn
 
 
 # solution based on https://www.geeksforgeeks.org/traveling-salesman-problem-using-branch-and-bound-2/
@@ -137,10 +138,15 @@ saved_addresses = {
     ('Näituse 15, Tartu, Estonia', 'Kastani 15, Tartu, Estonia'),
 }
 
+# list holds locations as latitude longitude pairs/tuples that will be used for path operations
+persisted_locations = []
+
 @app.route('/')
 def index():
     return render_template('index.html')
 
+
+# =========== ROUTE APIS ===========
 
 @app.route('/path', methods=['GET'])
 @cross_origin()
@@ -187,4 +193,108 @@ def api_save_path():
     return jsonify(list(saved_addresses))
 
 
-app.run()
+@app.route('/path_google', methods=['GET'])
+@cross_origin()
+def api_get_path_google():
+    locations = get_flat_addresses(persisted_locations)
+    start_time = time.time()
+    direction = gmaps.directions(origin=locations[0], destination=locations[0], waypoints=locations[1:],
+                                 optimize_waypoints=True, mode="driving", alternatives=False)
+    print('received direction in ', (time.time() - start_time), ' s:', direction)
+    print("path distance: ", direction[0]['legs'][0]['distance']['value'])
+
+    path_distance = 0
+    path = []
+    first = True
+    for leg in direction[0]['legs']:
+        path_distance += leg['distance']['value']
+        if first:
+            path.append((leg['start_location']['lat'], leg['start_location']['lng']))
+            first = False
+        path.append((leg['end_location']['lat'], leg['end_location']['lng']))
+    print("constructed path: ", path)
+
+    print("overall distance=", path_distance)
+    return jsonify(path)
+
+
+@app.route('/path_coord_nn')
+@cross_origin()
+def api_get_path_coord_nn():
+    print("nn for: ", persisted_locations)
+    # flatten
+    locations = list()
+    for start, end in persisted_locations:
+        locations.append(start)
+        locations.append(end)
+    coord_distances = nn.calc_coord_distances(locations)
+
+    print("coord distances: ", coord_distances)
+    path_indices, distance = nn.nearest_neighbor(0, coord_distances)
+
+    print("returning distance=", distance)
+    print("returning path: ", path_indices)
+
+    path = []
+    for i in path_indices:
+        path.append(locations[i])
+    print("constructed path")
+
+    return jsonify(path)
+
+
+# =========== LOCATIONS APIS ===========
+
+@app.route('/locations/add')
+@cross_origin()
+def add_start_end():
+    print("adding location: ", request)
+    start = request.args.get('from', '')
+    end = request.args.get('to', '')
+    start_coordinates = start.split(',')
+    end_coordinates = end.split(',')
+    print('values %s, %s' % (start_coordinates, end_coordinates))
+    start_lat = float(start_coordinates[0])
+    start_lng = float(start_coordinates[1])
+    end_lat = float(end_coordinates[0])
+    end_lng = float(end_coordinates[1])
+
+    persisted_locations.append(((start_lat, start_lng), (end_lat, end_lng)))
+    return "ok"
+
+
+@app.route('/locations/add_multiple', methods=['POST'])
+@cross_origin()
+def add_locations():
+    print("adding locations: ", request)
+    print("is_json:", request.is_json)
+    locs = request.get_json()
+    print("json: ", locs)
+    print(dir(locs))
+    print(locs['locations'])
+    for loc in locs['locations']:
+        print("loc: %s" % (loc))
+        persisted_locations.append((
+            (float(loc['from']['lat']), float(loc['from']['lng'])),
+            (float(loc['to']['lat']), float(loc['to']['lng']))
+        ))
+
+    return "ok"
+
+
+@app.route('/locations')
+@cross_origin()
+def get_locations():
+    print("get locations: ", request)
+    print("locations:", persisted_locations)
+    return jsonify(persisted_locations)
+
+
+@app.route('/locations/reset')
+def reset():
+    print("reset locations")
+    persisted_locations.clear()
+    return "ok"
+
+
+app.run(debug=True)
