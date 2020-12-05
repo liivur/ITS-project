@@ -3,7 +3,8 @@ import googlemaps
 import math
 from flask_cors import CORS, cross_origin
 import time
-import coord_based_nn as nn
+import nearest_neighbour as nn
+import brute_force as bf
 
 
 # solution based on https://www.geeksforgeeks.org/traveling-salesman-problem-using-branch-and-bound-2/
@@ -130,6 +131,11 @@ def get_flat_addresses(addresses):
     return flat
 
 
+def add_start_and_end(locations):
+    locations.insert(0, start_end_location)
+    locations.append(start_end_location)
+
+
 gmaps = googlemaps.Client(key='AIzaSyCg2zb5Hlx6LNU0zaJw9vg98WvUv7JoZCw')
 
 app = Flask(__name__)
@@ -140,6 +146,7 @@ saved_addresses = {
 
 # list holds locations as latitude longitude pairs/tuples that will be used for path operations
 persisted_locations = []
+start_end_location = (58.364129, 26.698139)
 
 @app.route('/')
 def index():
@@ -197,6 +204,8 @@ def api_save_path():
 @cross_origin()
 def api_get_path_google():
     locations = get_flat_addresses(persisted_locations)
+    # add_start_and_end(locations)
+
     start_time = time.time()
     direction = gmaps.directions(origin=locations[0], destination=locations[0], waypoints=locations[1:],
                                  optimize_waypoints=True, mode="driving", alternatives=False)
@@ -211,12 +220,9 @@ def api_get_path_google():
     for leg in direction[0]['legs']:
         path_distance += leg['distance']['value']
         if first:
-            # path.append((leg['start_location']['lat'], leg['start_location']['lng']))
             path.append({"location": {"lat": leg['start_location']['lat'], "lng": leg['start_location']['lng']}})
-            # path.append({"location": {"lat": locations[i][0], "lng": locations[i][1]}})
             first = False
         path.append({"location": {"lat": leg['end_location']['lat'], "lng": leg['end_location']['lng']}})
-        # path.append((leg['end_location']['lat'], leg['end_location']['lng']))
     print("constructed path: ", path)
     responseDict = {"path": path, "distance": path_distance, "time": time_taken}
 
@@ -233,22 +239,71 @@ def api_get_path_coord_nn():
     for start, end in persisted_locations:
         locations.append(start)
         locations.append(end)
+    # add_start_and_end(locations)
+
     start_time = time.time()
-    coord_distances = nn.calc_coord_distances(locations)
+    path, distance = nn.nearest_neighbour_coordinates(locations)
+    # coord_distances = nn.calc_coord_distances(locations)
     time_taken = time.time() - start_time
 
-    print("coord distances: ", coord_distances)
-    path_indices, distance = nn.nearest_neighbor(0, coord_distances)
+    # print("coord distances: ", coord_distances)
+    # path_indices, distance = nn.nearest_neighbor(0, coord_distances)
 
     print("returning distance=", distance)
-    print("returning path: ", path_indices)
 
-    path = []
+    returning_path = []
 
-    for i in path_indices:
-        path.append({"location": {"lat": locations[i][0], "lng": locations[i][1]}})
-    print("constructed path")
-    responseDict = {"path": path, "distance": distance, "time": time_taken}
+    for p in path:
+        returning_path.append({"location": {"lat": p[0], "lng": p[1]}})
+    print("returning path: ", returning_path)
+    responseDict = {"path": returning_path, "distance": distance, "time": time_taken}
+
+    return jsonify(responseDict)
+
+
+@app.route('/path_coord_nn_dep')
+@cross_origin()
+def api_get_path_coord_nn_dep():
+    start_time = time.time()
+    path, distance = nn.nearest_neighbour_dependencies_start(persisted_locations, start_end_location)
+    time_taken = time.time() - start_time
+    print("time taken: ", time_taken)
+    print("path: ", path)
+    print("distance: ", distance)
+
+    returning_path = []
+
+    for p in path:
+        returning_path.append({"location": {"lat": p[0], "lng": p[1]}})
+    print("returning path: ", returning_path)
+    responseDict = {"path": returning_path, "distance": distance, "time": time_taken}
+
+    return jsonify(responseDict)
+
+
+@app.route('/path_brute_axe')
+@cross_origin()
+def brute_axe_method():
+    # flatten
+    locations = list()
+    for start, end in persisted_locations:
+        locations.append(start)
+        locations.append(end)
+    # add_start_and_end(locations)
+
+    start_time = time.time()
+    path, distance = bf.brute_force_axe(locations)
+    time_taken = time.time() - start_time
+
+    print("returning distance=", distance)
+    print("returning path: ", path)
+
+    returning_path = []
+
+    for p in path:
+        returning_path.append({"location": {"lat": p[0], "lng": p[1]}})
+
+    responseDict = {"path": returning_path, "distance": distance, "time": time_taken}
 
     return jsonify(responseDict)
 

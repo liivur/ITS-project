@@ -59,7 +59,8 @@ $(document).ready(function() {
 	
 	function getPath(from = '', to = '') {
 		$.ajax({
-			url: apiUrl + 'path',
+			//url: apiUrl + 'path',
+			url: apiUrl + 'path_coord_nn_dep',
 			type: 'GET',
 			dataType: 'json',
 			data: {
@@ -72,8 +73,10 @@ $(document).ready(function() {
 			let path = response.path.map(function(elem, index) {
 				return {
 					location: {
-						lat: elem.coords[0],
-						lng: elem.coords[1],
+						// lat: elem.coords[0],
+						// lng: elem.coords[1],
+						lat: elem.location.lat,
+						lng: elem.location.lng,
 					},
 				}
 			});
