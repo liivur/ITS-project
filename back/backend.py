@@ -111,6 +111,7 @@ def api_get_path():
         'path': mapped_path,
         'distance': result,
         'time': time_taken,
+        'pairs': pairs,
     })
 
 

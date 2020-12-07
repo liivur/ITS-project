@@ -15,6 +15,7 @@ var map;
 $(document).ready(function() {
 	let from = '';
 	let to = '';
+	const pairPaths = [];
 	
 	map = new google.maps.Map(document.getElementById('map'), {
 		zoom: 14,
@@ -45,15 +46,16 @@ $(document).ready(function() {
 	}
 
 	function setMarker(marker, location) {
-		console.log('set marker', marker, location);
 		marker.setPosition(location);
 		marker.setMap(map);
 	}
 
-	function updateMap(path) {
-		console.log('updateMap', path);
+	function updateMap(path, pairs) {
 		if (path.length < 2) {
 			return;
+		}
+		while (pairPaths.length) {
+			pairPaths.pop().setMap(null);
 		}
 		const origin = path.shift().location;
     	const destination = path.pop().location;
@@ -71,14 +73,34 @@ $(document).ready(function() {
 				console.log('Directions request failed due to ' + status);
 			}
 		});
-		// const flightPath = new google.maps.Polyline({
-		// 	path: path,
-		// 	geodesic: true,
-		// 	strokeColor: '#FF0000',
-		// 	strokeOpacity: 1.0,
-		// 	strokeWeight: 2,
-		// });
-		// flightPath.setMap(map);
+
+		if (pairs && pairs.length) {
+			let icons = [
+				{
+					icon: {
+						path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+					},
+					offset: "100%",
+				},
+			];
+			for (var i = pairs.length - 1; i >= 0; i--) {
+				flightPath = new google.maps.Polyline({
+					path: pairs[i].map(function(item) {
+						return {
+							lat: item[0],
+							lng: item[1],
+						};
+					}),
+					icons: icons,
+					geodesic: true,
+					strokeColor: '#FF0000',
+					strokeOpacity: 1.0,
+					strokeWeight: 2,
+				});
+				flightPath.setMap(map);
+				pairPaths.push(flightPath);
+			}
+		}
 	}
 	
 	function getPath(from = '', to = '') {
@@ -104,7 +126,7 @@ $(document).ready(function() {
 			// 		},
 			// 	}
 			// });
-			updateMap(response.path);
+			updateMap(response.path, response.pairs);
 			console.log('success', response);
 		})
 		.fail(function(e) {
