@@ -1,8 +1,3 @@
-// This example creates a 2-pixel-wide red polyline showing the path of
-// the first trans-Pacific flight between Oakland, CA, and Brisbane,
-// Australia which was made by Charles Kingsford Smith.
-// var map;
-
 // const apiUrl = 'https://135eq1ocxffj-496ff2e9c6d22116-5000-colab.googleusercontent.com/';
 const apiUrl = 'http://localhost:5000/';
 
@@ -16,21 +11,50 @@ const apiUrl = 'http://localhost:5000/';
 	// ];
 // }
 
-
+var map;
 $(document).ready(function() {
-	let map = new google.maps.Map(document.getElementById('map'), {
+	let from = '';
+	let to = '';
+	
+	map = new google.maps.Map(document.getElementById('map'), {
 		zoom: 14,
 		center: { lat: 58.38, lng: 26.73 },
 		mapTypeId: 'terrain',
 	});
+	let markers = {
+		from: new google.maps.Marker({
+		    title:'From'
+		}),
+		to: new google.maps.Marker({
+		    title:'To'
+		}),
+	};
 
 	let geocoder = new google.maps.Geocoder();
 	let directionsService = new google.maps.DirectionsService();
 	let directionsDisplay = new google.maps.DirectionsRenderer();
 	directionsDisplay.setMap(map);
 
+	function resetFromTo() {
+		from = '';
+		to = '';
+		$('.js-address-from').val('');
+		$('.js-address-to').val('');
+		markers.from.setMap(null);
+		markers.to.setMap(null);
+	}
+
+	function setMarker(marker, location) {
+		console.log('set marker', marker, location);
+		marker.setPosition(location);
+		marker.setMap(map);
+	}
+
 	function updateMap(path) {
 		console.log('updateMap', path);
+		if (path.length < 2) {
+			return;
+		}
 		const origin = path.shift().location;
     	const destination = path.pop().location;
 
@@ -59,8 +83,8 @@ $(document).ready(function() {
 	
 	function getPath(from = '', to = '') {
 		$.ajax({
-			//url: apiUrl + 'path',
-			url: apiUrl + 'path_coord_nn_dep',
+			url: apiUrl + 'path',
+			// url: apiUrl + 'path_coord_nn_dep',
 			type: 'GET',
 			dataType: 'json',
 			data: {
@@ -70,17 +94,17 @@ $(document).ready(function() {
 			crossDomain: true,
 		})
 		.done(function(response) {
-			let path = response.path.map(function(elem, index) {
-				return {
-					location: {
-						// lat: elem.coords[0],
-						// lng: elem.coords[1],
-						lat: elem.location.lat,
-						lng: elem.location.lng,
-					},
-				}
-			});
-			updateMap(path);
+			// let path = response.path.map(function(elem, index) {
+			// 	return {
+			// 		location: {
+			// 			// lat: elem.coords[0],
+			// 			// lng: elem.coords[1],
+			// 			lat: elem.location.lat,
+			// 			lng: elem.location.lng,
+			// 		},
+			// 	}
+			// });
+			updateMap(response.path);
 			console.log('success', response);
 		})
 		.fail(function(e) {
@@ -116,17 +140,14 @@ $(document).ready(function() {
 	$('.js-check-path').on('click', function(e) {
 		e.preventDefault();
 
-		getPath($('.js-address-from').val(), $('.js-address-to').val());
+		getPath(from, to);
 	});
 
 	$('.js-save-path').on('click', function(e) {
 		e.preventDefault();
 
-		$from = $('.js-address-from');
-		$to = $('.js-address-to');
-		savePath($from.val(), $to.val());
-		$from.val('');
-		$to.val('');
+		savePath(from, to);
+		resetFromTo();
 	});
 
 	let isFrom = true;
@@ -145,17 +166,26 @@ $(document).ready(function() {
 	google.maps.event.addListener(map, 'click', function(event){
 		geocoder.geocode({
 			'latLng': event.latLng
-			}, function(results, status) {
-				if (status == google.maps.GeocoderStatus.OK && results[0]) {
-					if (isFrom) {
-						$('.js-address-from').val(results[0].formatted_address)
-					} else {
-						$('.js-address-to').val(results[0].formatted_address)
-					}
+		}, 
+		function(results, status) {
+			console.log(results, status);
+			if (status == google.maps.GeocoderStatus.OK && results[0]) {
+				let coords = event.latLng.lat() + ',' + event.latLng.lng();
+				if (isFrom) {
+					from = coords;
+					setMarker(markers.from, event.latLng);
+					$('.js-address-from').val(results[0].formatted_address)
+				} else {
+					to = coords;
+					setMarker(markers.to, event.latLng);
+					$('.js-address-to').val(results[0].formatted_address)
 				}
-			});
+			}
+		});
 		console.log('map click', event);
 	});
 
 	// points = ['Mõisavahe 2, Tartu, Estonia', 'Näituse 3, Tartu, Estonia', 'Turu 8, Tartu, Estonia', 'Riia 120, Tartu, Estonia']
+
+	
 });

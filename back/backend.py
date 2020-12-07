@@ -1,111 +1,26 @@
 from flask import Flask, escape, jsonify, request, render_template
 import googlemaps
-import math
 from flask_cors import CORS, cross_origin
 import time
 import nearest_neighbour as nn
 import brute_force as bf
+from branch_and_bound import get_path, get_path_constrained
 
 
-# solution based on https://www.geeksforgeeks.org/traveling-salesman-problem-using-branch-and-bound-2/
-# Function to find the minimum edge cost
-# having an end at the vertex i
-def first_min(weights, i, maxsize=float('inf')):
-    minimum = maxsize
-    for k in range(len(weights)):
-        if weights[i][k] < minimum and i != k:
-            minimum = weights[i][k]
+def get_points_with_constraints(point_pairs):
+    points = []
+    for pair in point_pairs:
+        points.append(pair[0])
+        points.append(pair[1])
 
-    return minimum
+    indexes = {}
+    points = list(set(points))
+    for i in range(len(points)):
+        indexes[points[i]] = i
 
+    constraints = [(indexes[pair[0]], indexes[pair[1]]) for pair in point_pairs]
 
-# function to find the second minimum edge
-# cost having an end at the vertex i
-def second_min(weights, i, maxsize=float('inf')):
-    first, second = maxsize, maxsize
-    for j in range(len(weights)):
-        if i == j:
-            continue
-        if weights[i][j] <= first:
-            second = first
-            first = weights[i][j]
-        elif weights[i][j] <= second and weights[i][j] != first:
-            second = weights[i][j]
-
-    return second
-
-
-def get_path_rec(weights, lower_bound, weight, level, path, visited, final_result=float('inf')):
-    n = len(weights)
-
-    # base case is when we have reached level N
-    # which means we have covered all the nodes once
-    if level == n:
-        # current_result has the total weight of the solution we got
-        current_result = weight + weights[path[level - 1]][path[0]]
-        final_path = path[:]
-        final_path[n] = path[0]
-
-        return current_result, final_path
-
-    final_path = []
-    # for any other level iterate for all vertices to build the search space tree recursively
-    for i in range(n):
-        if weights[path[level - 1]][i] == 0 or visited[i]:
-            continue
-
-        current_weight = weight + weights[path[level - 1]][i]
-
-        # different computation of curr_bound
-        # for level 2 from the other levels
-        if level == 1:
-            item_bound = (first_min(weights, path[level - 1]) + first_min(weights, i)) / 2
-        else:
-            item_bound = (second_min(weights, path[level - 1]) + first_min(weights, i)) / 2
-
-        t_bound = lower_bound - item_bound
-        # t_bound + current_weight is the actual lower bound for the node that we have arrived on.
-        # If current lower bound < final_res, we need to explore the node further
-        if t_bound + current_weight < final_result:
-            path[level] = i
-            visited[i] = True
-            t_result, t_path = get_path_rec(weights, t_bound, current_weight, level + 1, path, visited, final_result)
-
-            if t_result < final_result:
-                final_result = t_result
-                final_path = t_path
-
-        visited = [False] * len(visited)
-        for j in range(level):
-            if path[j] != -1:
-                visited[path[j]] = True
-
-    return final_result, final_path
-
-
-def get_path(weights):
-    n = len(weights)
-
-    # Calculate initial lower bound for the root node
-    # using the formula 1/2 * (sum of first min +
-    # second min) for all edges.
-    bound = 0
-    for i in range(n):
-        bound += first_min(weights, i) + second_min(weights, i)
-    bound = math.ceil(bound / 2)
-
-    # Initialize the current_path and visited array
-    path = [-1] * (n + 1)
-    visited = [False] * n
-
-    # We start at vertex 1 so the first vertex
-    # in path[] is 0
-    visited[0] = True
-    path[0] = 0
-
-    # Call to get_path_rec for curr_weight
-    # equal to 0 and level 1
-    return get_path_rec(weights, bound, 0, 1, path, visited)
+    return points, constraints
 
 
 def get_path_from_addresses(addresses):
@@ -115,6 +30,19 @@ def get_path_from_addresses(addresses):
     distance_matrix = gmaps.distance_matrix(origins=addresses, destinations=addresses)
     adj = [list(map(lambda x: x['duration']['value'], row['elements'])) for row in distance_matrix['rows']]
     return get_path(adj)
+
+
+def get_path_from_pairs(pairs):
+    if len(pairs) < 2:
+        return 0, []
+
+    points, constraints = get_points_with_constraints(pairs)
+
+    distance_matrix = gmaps.distance_matrix(origins=points, destinations=points)
+    adj = [list(map(lambda x: x['duration']['value'], row['elements'])) for row in distance_matrix['rows']]
+    result, path = get_path_constrained(adj, constraints)
+
+    return result, map(lambda i: points[i], path)
 
 
 def get_coords(address):
@@ -139,6 +67,9 @@ def add_start_and_end(locations):
 gmaps = googlemaps.Client(key='AIzaSyCg2zb5Hlx6LNU0zaJw9vg98WvUv7JoZCw')
 
 app = Flask(__name__)
+saved_pairs = {
+    ((58.364129, 26.698139), (58.365129, 26.698239)),
+}
 saved_addresses = {
     ('Mõisavahe 2, Tartu, Estonia', 'Kastani 15, Tartu, Estonia'),
     ('Näituse 15, Tartu, Estonia', 'Kastani 15, Tartu, Estonia'),
@@ -147,6 +78,7 @@ saved_addresses = {
 # list holds locations as latitude longitude pairs/tuples that will be used for path operations
 persisted_locations = []
 start_end_location = (58.364129, 26.698139)
+
 
 @app.route('/')
 def index():
@@ -161,26 +93,24 @@ def api_get_path():
     start = request.args.get('from', '')
     end = request.args.get('to', '')
 
-    print("path from %s to %s" % (start, end))
-
-    # TODO: add proper handling for from and to
-    addresses = get_flat_addresses(saved_addresses)
+    pairs = list(saved_pairs)
     if start and end:
-        addresses.append(start)
-        addresses.append(end)
+        start = tuple(map(lambda x: float(x), start.split(',')))
+        end = tuple(map(lambda x: float(x), end.split(',')))
+        pairs.append((start, end))
 
-    result, path = get_path_from_addresses(addresses)
+    start_time = time.time()
+    result, path = get_path_from_pairs(pairs)
+    time_taken = time.time() - start_time
 
-    locations = []
-    for i in path:
-        locations.append({
-            'address': addresses[i],
-            'coords': get_coords(addresses[i]),
-        })
+    mapped_path = []
+    for p in path:
+        mapped_path.append({"location": {"lat": p[0], "lng": p[1]}})
 
     return jsonify({
-        'path': locations,
-        'result': result,
+        'path': mapped_path,
+        'distance': result,
+        'time': time_taken,
     })
 
 
@@ -191,13 +121,15 @@ def api_save_path():
     start = request.form.get('from', '')
     end = request.form.get('to', '')
 
-    print("saving path from %s to %s" %(start, end))
     if not (start and end):
         return "Error: No path field provided. Please specify an path."
 
-    saved_addresses.add((start, end))
+    start = tuple(map(lambda x: float(x), start.split(',')))
+    end = tuple(map(lambda x: float(x), end.split(',')))
 
-    return jsonify(list(saved_addresses))
+    saved_pairs.add((start, end))
+
+    return jsonify(list(saved_pairs))
 
 
 @app.route('/path_google', methods=['GET'])
