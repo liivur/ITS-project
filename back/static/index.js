@@ -13,6 +13,7 @@ const apiUrl = 'http://localhost:5000/';
 
 var map;
 $(document).ready(function() {
+	getAlgorithms();
 	getSlots();
 	let from = '';
 	let to = '';
@@ -113,9 +114,9 @@ $(document).ready(function() {
 		}
 	}
 	
-	function getPaths(slot, from = '', to = '') {
+	function getPaths(path, slot, from = '', to = '') {
 		$.ajax({
-			url: apiUrl + 'path',
+			url: apiUrl + path,
 			// url: apiUrl + 'path_coord_nn_dep',
 			// url: apiUrl + 'path_brute_axe',
 			// url: apiUrl + 'path_google',
@@ -169,8 +170,9 @@ $(document).ready(function() {
 	$('.js-check-path').on('click', function(e) {
 		e.preventDefault();
 
-		$button = $('input[name="slot"]:checked');
-		getPaths($button.val(), from, to);
+		$slot = $('input[name="slot"]:checked');
+		$algo = $('.js-algorithm-select');
+		getPaths($algo.val(), $slot.val(), from, to);
 	});
 
 	$('.js-save-path').on('click', function(e) {
@@ -182,8 +184,7 @@ $(document).ready(function() {
 	});
 
 	let isFrom = true;
-	function toggleFromTo(e) {
-		e.preventDefault();
+	function toggleFromTo() {
 		isFrom = !isFrom;
 		$button = $('.js-toggle-from-to');
 		if (isFrom) {
@@ -192,7 +193,10 @@ $(document).ready(function() {
 			$button.text('Select to');
 		}
 	}
-	$('.js-toggle-from-to').on('click', toggleFromTo);
+	$('.js-toggle-from-to').on('click', function(e) {
+		e.preventDefault();
+		toggleFromTo();
+	});
 
 	google.maps.event.addListener(map, 'click', function(event){
 		geocoder.geocode({
@@ -211,6 +215,7 @@ $(document).ready(function() {
 					setMarker(markers.to, event.latLng);
 					$('.js-address-to').val(results[0].formatted_address)
 				}
+				toggleFromTo();
 			}
 		});
 		console.log('map click', event);
@@ -230,6 +235,21 @@ $(document).ready(function() {
 				return '<label>' + item + '<input type="radio" name="slot" value="' + item + '"></label>';
 			}).join('<br>'));
 			$('input[name="slot"]').first().prop('checked', true);
+		});
+	}
+
+	function getAlgorithms() {
+		$.ajax({
+			url: apiUrl + 'algorithms',
+			type: 'GET',
+			dataType: 'json',
+			crossDomain: true,
+		}).done(function(response) {
+			console.log('success', response);
+			$('.js-algorithm-select').html(response.map(function(item) {
+				return '<option value="' + item.path + '">' + item.name + '</option>';
+			}).join('<br>'));
+			$('.js-algorithm-select option').first().prop('selected', true);
 		});
 	}
 });

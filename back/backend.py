@@ -312,4 +312,19 @@ def api_get_slots():
     return jsonify(timeslots)
 
 
+@app.route('/algorithms', methods=['GET'])
+@cross_origin()
+def api_get_algorithms():
+    return jsonify([
+        {
+            'name': 'Branch and bound',
+            'path': 'path',
+        },
+        {
+            'name': 'Nearest neighbour',
+            'path': 'path_coord_nn_dep',
+        },
+    ])
+
+
 app.run(debug=True)
