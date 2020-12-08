@@ -105,8 +105,9 @@ $(document).ready(function() {
 	
 	function getPath(from = '', to = '') {
 		$.ajax({
-			url: apiUrl + 'path',
+			// url: apiUrl + 'path',
 			// url: apiUrl + 'path_coord_nn_dep',
+			url: apiUrl + 'path_google',
 			type: 'GET',
 			dataType: 'json',
 			data: {

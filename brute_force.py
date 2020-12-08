@@ -1,10 +1,11 @@
-import nearest_neighbour as nn
+import coordinate_based as cb
 
 path_counter = 0
 
 
-def brute_force_axe(locations):
+def brute_force_axe(locations, distance_func=cb.coordinates_distance):
     return brute_force_rec(list(), locations)
+
 
 # no dependencies yet
 def brute_force_rec(path, locations):
@@ -30,7 +31,7 @@ def brute_force_rec(path, locations):
 def calculate_path_distance(path):
     distance = 0
     for i in range(1, len(path)):
-        distance += nn.coordinates_distance(path[i-1], path[i])
+        distance += cb.coordinates_distance(path[i-1], path[i])
     return distance
 
 

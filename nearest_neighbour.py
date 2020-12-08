@@ -2,6 +2,8 @@ import coordinate_based as cb
 
 
 def nearest_neighbour_coordinates(locations):
+    """Constructs path according to nearest neighbor. Expects flat list
+    of coordinates. Does not take into account dependencies."""
     coord_distances = cb.calc_coord_distances(locations)
 
     print("coord distances: ", coord_distances)
@@ -41,11 +43,39 @@ def nearest_neighbor(start, adj_matrix):
     return path, distance
 
 
+def flatten(locations, start_end=None):
+    flattened_locations = []
+    if start_end is not None:
+        flattened_locations.append(start_end)
+
+    for start, end in locations:
+        flattened_locations.append(start)
+        flattened_locations.append(end)
+
+    return flattened_locations
+
+
+def nearest_neighbor_dep_coord_based(locations, start_end_point=None):
+    """Coordinate based nearest neighbor with dependencies, uses coordinate based adj matrix.
+    Could also just pass the distance function forward"""
+    # flatten locations and add start_end(as first)
+    flattened = flatten(locations, start_end_point)
+    # calc adj matrix for distance func
+    adj_matrix = cb.calc_coord_distances(flattened)
+
+    def adj_based_coord_distance(point1, point2):
+        return adj_matrix[point1][point2]
+
+    return nearest_neighbour_dependencies(locations, distance_func=adj_based_coord_distance,
+                                          start_point=start_end_point)
+
+
 # honours also from -> to dependencies
-def nearest_neighbour_dependencies_start(locations, start_point = None):
+def nearest_neighbour_dependencies(locations, distance_func=cb.coordinates_distance, start_point=None):
     """Nearest neighbour path search. Takes into account dependencies between starting and ending points.
     Select first element's start point and add to path. Now find minimal distances between the lastly added point and
-    all starting points plus ending points that are already in path."""
+    all starting points plus ending points that are already in path. If start is given then add this point to the
+    start and end of path."""
     path = []
     overall_distance = 0
     if start_point is not None:
@@ -55,12 +85,15 @@ def nearest_neighbour_dependencies_start(locations, start_point = None):
         locs = locations.copy()
         # path = locs[0][0] # start of first tuple
         while len(locs) > 0:
+
+            # if start point is not given then add first point(from first tuple) of locations and start with that
             if start_point is None:
                 path.append(locs[0][0])
                 current_point = locs[0][0]
                 locs[0] = (None, locs[0][1])
             else:
                 current_point = start_point
+
             min_distance = float('inf')
             closest_point_index = -1
             for i, (start, end) in enumerate(locs):
@@ -71,7 +104,7 @@ def nearest_neighbour_dependencies_start(locations, start_point = None):
                     point = start
 
                 # calc distance
-                distance = cb.coordinates_distance(current_point, point)
+                distance = distance_func(current_point, point)
                 if distance < min_distance:
                     min_distance = distance
                     closest_point_index = i
@@ -88,9 +121,8 @@ def nearest_neighbour_dependencies_start(locations, start_point = None):
             overall_distance += min_distance
 
         # add starting point to the end also
-        distance = cb.coordinates_distance(path[-1], start_point)
+        distance = distance_func(path[-1], start_point)
         path.append(start_point)
         overall_distance += distance
 
     return path, overall_distance
-

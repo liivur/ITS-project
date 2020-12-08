@@ -5,6 +5,7 @@ import time
 import nearest_neighbour as nn
 import brute_force as bf
 from branch_and_bound import get_path, get_path_constrained
+import api_model
 
 
 def get_points_with_constraints(point_pairs):
@@ -64,6 +65,35 @@ def add_start_and_end(locations):
     locations.append(start_end_location)
 
 
+# duplicate with one in nearest_neighbor
+def flatten(locations, start_end=None):
+    flattened_locations = []
+    if start_end is not None:
+        flattened_locations.append(start_end)
+
+    for start, end in locations:
+        flattened_locations.append(start)
+        flattened_locations.append(end)
+
+    return flattened_locations
+
+
+def get_google_based_distance_func(locations, start_end_point):
+    flattened_points = flatten(locations, start_end_point)
+    # calc adj matrix for distance func
+    distance_matrix = gmaps.distance_matrix(origins=flattened_points, destinations=flattened_points)
+    # print("distance_matrix: ", distance_matrix)
+    adj_matrix = [list(map(lambda x: x['distance']['value'], row['elements'])) for row in distance_matrix['rows']]
+    # print("google adj matrix:", adj_matrix)
+
+    def adj_based_road_distance(point1, point2):
+        point1_index = flattened_points.index(point1)
+        point2_index = flattened_points.index(point2)
+        return adj_matrix[point1_index][point2_index]
+
+    return adj_based_road_distance
+
+
 gmaps = googlemaps.Client(key='AIzaSyCg2zb5Hlx6LNU0zaJw9vg98WvUv7JoZCw')
 
 app = Flask(__name__)
@@ -103,16 +133,8 @@ def api_get_path():
     result, path = get_path_from_pairs(pairs)
     time_taken = time.time() - start_time
 
-    mapped_path = []
-    for p in path:
-        mapped_path.append({"location": {"lat": p[0], "lng": p[1]}})
-
-    return jsonify({
-        'path': mapped_path,
-        'distance': result,
-        'time': time_taken,
-        'pairs': pairs,
-    })
+    path_model = api_model.Path(api_model.convert_simple_path(path), result, time_taken, pairs)
+    return jsonify(path_model.get_api_dict())
 
 
 @app.route('/path', methods=['POST'])
@@ -136,31 +158,20 @@ def api_save_path():
 @app.route('/path_google', methods=['GET'])
 @cross_origin()
 def api_get_path_google():
-    locations = get_flat_addresses(persisted_locations)
+    flattened = flatten(locations=persisted_locations)
+    # locations = get_flat_addresses(persisted_locations)
     # add_start_and_end(locations)
 
     start_time = time.time()
-    direction = gmaps.directions(origin=locations[0], destination=locations[0], waypoints=locations[1:],
+    direction = gmaps.directions(origin=start_end_location, destination=start_end_location, waypoints=flattened,
                                  optimize_waypoints=True, mode="driving", alternatives=False)
     time_taken = time.time() - start_time
-    print('received direction in ', time_taken, ' s:', direction)
-    print("path distance: ", direction[0]['legs'][0]['distance']['value'])
 
-    path_distance = 0
+    path, path_distance = api_model.convert_google_directions_to_path(direction)
 
-    path = []
-    first = True
-    for leg in direction[0]['legs']:
-        path_distance += leg['distance']['value']
-        if first:
-            path.append({"location": {"lat": leg['start_location']['lat'], "lng": leg['start_location']['lng']}})
-            first = False
-        path.append({"location": {"lat": leg['end_location']['lat'], "lng": leg['end_location']['lng']}})
-    print("constructed path: ", path)
-    responseDict = {"path": path, "distance": path_distance, "time": time_taken}
+    api_path = api_model.Path(path, path_distance, time_taken, persisted_locations)
 
-    print("overall distance=", path_distance)
-    return jsonify(responseDict)
+    return jsonify(api_path.get_api_dict())
 
 
 @app.route('/path_coord_nn')
@@ -172,73 +183,71 @@ def api_get_path_coord_nn():
     for start, end in persisted_locations:
         locations.append(start)
         locations.append(end)
-    # add_start_and_end(locations)
 
     start_time = time.time()
     path, distance = nn.nearest_neighbour_coordinates(locations)
     # coord_distances = nn.calc_coord_distances(locations)
     time_taken = time.time() - start_time
 
-    # print("coord distances: ", coord_distances)
-    # path_indices, distance = nn.nearest_neighbor(0, coord_distances)
-
     print("returning distance=", distance)
 
-    returning_path = []
+    api_path = api_model.Path(api_model.convert_simple_path(path), distance, time_taken, persisted_locations)
 
-    for p in path:
-        returning_path.append({"location": {"lat": p[0], "lng": p[1]}})
-    print("returning path: ", returning_path)
-    responseDict = {"path": returning_path, "distance": distance, "time": time_taken}
-
-    return jsonify(responseDict)
+    return jsonify(api_path.get_api_dict())
 
 
 @app.route('/path_coord_nn_dep')
 @cross_origin()
 def api_get_path_coord_nn_dep():
-    start_time = time.time()
-    path, distance = nn.nearest_neighbour_dependencies_start(persisted_locations, start_end_location)
-    time_taken = time.time() - start_time
+    google_road_based_distance = True  # otherwise coordinate based distance
+
+    if google_road_based_distance:
+        road_distance_func = get_google_based_distance_func(persisted_locations, start_end_location)
+        start_time = time.time()
+        path, distance = nn.nearest_neighbour_dependencies(persisted_locations, road_distance_func, start_end_location)
+        time_taken = time.time() - start_time
+    else:
+        start_time = time.time()
+        path, distance = nn.nearest_neighbor_dep_coord_based(persisted_locations, start_end_location)
+        time_taken = time.time() - start_time
+
     print("time taken: ", time_taken)
     print("path: ", path)
     print("distance: ", distance)
 
-    returning_path = []
+    api_path = api_model.Path(api_model.convert_simple_path(path), distance, time_taken, persisted_locations)
 
-    for p in path:
-        returning_path.append({"location": {"lat": p[0], "lng": p[1]}})
-    print("returning path: ", returning_path)
-    responseDict = {"path": returning_path, "distance": distance, "time": time_taken}
-
-    return jsonify(responseDict)
+    return jsonify(api_path.get_api_dict())
 
 
 @app.route('/path_brute_axe')
 @cross_origin()
 def brute_axe_method():
     # flatten
-    locations = list()
-    for start, end in persisted_locations:
-        locations.append(start)
-        locations.append(end)
+    flattened = flatten(persisted_locations, start_end_location)
+    # locations = list()
+    # for start, end in persisted_locations:
+    #     locations.append(start)
+    #     locations.append(end)
     # add_start_and_end(locations)
 
+    # TODO honor dependencies
     start_time = time.time()
-    path, distance = bf.brute_force_axe(locations)
+    path, distance = bf.brute_force_axe(flattened)
     time_taken = time.time() - start_time
 
     print("returning distance=", distance)
     print("returning path: ", path)
 
-    returning_path = []
+    api_path = api_model.Path(api_model.convert_simple_path(path), distance, time_taken, persisted_locations)
 
-    for p in path:
-        returning_path.append({"location": {"lat": p[0], "lng": p[1]}})
+    # returning_path = []
+    # for p in path:
+    #     returning_path.append({"location": {"lat": p[0], "lng": p[1]}})
+    #
+    # responseDict = {"path": returning_path, "distance": distance, "time": time_taken}
 
-    responseDict = {"path": returning_path, "distance": distance, "time": time_taken}
-
-    return jsonify(responseDict)
+    return jsonify(api_path.get_api_dict())
 
 
 # =========== LOCATIONS APIS ===========
@@ -264,12 +273,7 @@ def add_start_end():
 @app.route('/locations/add_multiple', methods=['POST'])
 @cross_origin()
 def add_locations():
-    print("adding locations: ", request)
-    print("is_json:", request.is_json)
     locs = request.get_json()
-    print("json: ", locs)
-    print(dir(locs))
-    print(locs['locations'])
     for loc in locs['locations']:
         print("loc: %s" % (loc))
         persisted_locations.append((
