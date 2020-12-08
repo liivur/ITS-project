@@ -19,6 +19,26 @@ def coordinates_distance(point1, point2):
     return d
 
 
+def calculate_centroid(point1, point2):
+    return abs(point1[0] - point2[0])/2, abs(point1[1] - point2[1])/2
+
+
+def calculate_centroid(locations):
+    lat_sum = 0
+    lng_sum = 0
+    count = 0
+    for pair in locations:
+        lat_sum += pair[0][0] + pair[1][0]
+        lng_sum += pair[0][1] + pair[1][1]
+        count += 1
+
+    return lat_sum/count, lng_sum/count
+
+
+def calculate_distance(locations1, locations2):
+    return coordinates_distance(calculate_centroid(locations1), calculate_centroid(locations2))
+
+
 def calc_coord_distances(locations):
     """Calculate distances of all locations(latitude longitude).
     Expects flat list, not pairs of points"""

@@ -126,3 +126,13 @@ def nearest_neighbour_dependencies(locations, distance_func=cb.coordinates_dista
         overall_distance += distance
 
     return path, overall_distance
+
+
+def nearest_neighbour_multiple(locations, distance_func=cb.coordinates_distance, start_point=None, number_of_buses=1):
+    if number_of_buses > 1:
+
+
+
+
+        sorted_centroids = sorted(centroids, key=lambda x: x[0])
+

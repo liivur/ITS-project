@@ -6,6 +6,7 @@ import nearest_neighbour as nn
 import brute_force as bf
 from branch_and_bound import get_path, get_path_constrained
 import api_model
+import clustering
 
 
 def get_points_with_constraints(point_pairs):
@@ -201,6 +202,7 @@ def api_get_path_coord_nn():
 @app.route('/path_coord_nn_dep')
 @cross_origin()
 def api_get_path_coord_nn_dep():
+    # clusters = 2
     if google_road_based_distance:
         road_distance_func = get_google_based_distance_func(persisted_locations, start_end_location)
         start_time = time.time()
@@ -241,12 +243,6 @@ def brute_axe_method():
     print("returning path: ", path)
 
     api_path = api_model.Path(api_model.convert_simple_path(path), distance, time_taken, persisted_locations)
-
-    # returning_path = []
-    # for p in path:
-    #     returning_path.append({"location": {"lat": p[0], "lng": p[1]}})
-    #
-    # responseDict = {"path": returning_path, "distance": distance, "time": time_taken}
 
     return jsonify(api_path.get_api_dict())
 
