@@ -25,7 +25,7 @@ def get_points_with_constraints(point_pairs):
 
 
 def get_path_from_addresses(addresses):
-    if len(addresses) < 3:
+    if len(addresses) < 2:
         return 0, []
 
     distance_matrix = gmaps.distance_matrix(origins=addresses, destinations=addresses)
@@ -34,7 +34,7 @@ def get_path_from_addresses(addresses):
 
 
 def get_path_from_pairs(pairs):
-    if len(pairs) < 2:
+    if len(pairs) < 1:
         return 0, []
 
     points, constraints = get_points_with_constraints(pairs)
@@ -97,13 +97,13 @@ def get_google_based_distance_func(locations, start_end_point):
 gmaps = googlemaps.Client(key='AIzaSyCg2zb5Hlx6LNU0zaJw9vg98WvUv7JoZCw')
 
 app = Flask(__name__)
-saved_pairs = {
-    ((58.364129, 26.698139), (58.365129, 26.698239)),
-}
-saved_addresses = {
-    ('Mõisavahe 2, Tartu, Estonia', 'Kastani 15, Tartu, Estonia'),
-    ('Näituse 15, Tartu, Estonia', 'Kastani 15, Tartu, Estonia'),
-}
+
+timeslots = ['10:00', '10:30', '11:00', '11:30']
+saved_pairs = {}
+for slot in timeslots:
+    saved_pairs[slot] = set()
+
+saved_pairs['10:00'].add(((58.364129, 26.698139), (58.365129, 26.698239)))
 
 # list holds locations as latitude longitude pairs/tuples that will be used for path operations
 persisted_locations = []
@@ -124,8 +124,11 @@ def index():
 def api_get_path():
     start = request.args.get('from', '')
     end = request.args.get('to', '')
+    slot = request.args.get('slot', timeslots[0])
+    if not slot:
+        slot = timeslots[0]
 
-    pairs = list(saved_pairs)
+    pairs = list(saved_pairs[slot])
     if start and end:
         start = tuple(map(lambda x: float(x), start.split(',')))
         end = tuple(map(lambda x: float(x), end.split(',')))
@@ -145,6 +148,9 @@ def api_save_path():
     # addresses = request.args.getlist('addresses')
     start = request.form.get('from', '')
     end = request.form.get('to', '')
+    slot = request.args.get('slot', timeslots[0])
+    if not slot:
+        slot = timeslots[0]
 
     if not (start and end):
         return "Error: No path field provided. Please specify an path."
@@ -152,7 +158,7 @@ def api_save_path():
     start = tuple(map(lambda x: float(x), start.split(',')))
     end = tuple(map(lambda x: float(x), end.split(',')))
 
-    saved_pairs.add((start, end))
+    saved_pairs[slot].add((start, end))
 
     return jsonify(list(saved_pairs))
 
@@ -298,6 +304,12 @@ def reset():
     print("reset locations")
     persisted_locations.clear()
     return "ok"
+
+
+@app.route('/slots', methods=['GET'])
+@cross_origin()
+def api_get_slots():
+    return jsonify(timeslots)
 
 
 app.run(debug=True)

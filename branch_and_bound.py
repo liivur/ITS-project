@@ -88,6 +88,11 @@ def get_path_rec(weights, lower_bound, weight, level, path, visited, constraints
 def get_path(weights):
     n = len(weights)
 
+    if n < 2:
+        return 0, []
+    if n == 2:
+        return weights[0][1], [0, 1]
+
     # Calculate initial lower bound for the root node
     # using the formula 1/2 * (sum of first min +
     # second min) for all edges.
@@ -112,6 +117,11 @@ def get_path(weights):
 
 def get_path_constrained(weights, from_to=[]):
     n = len(weights)
+
+    if n < 2:
+        return 0, []
+    if n == 2:
+        return weights[from_to[0][0]][from_to[0][1]], [0, 1]
 
     # Set constraints - can only pick an edge if all the constraints are already in the path
     constraints = [[] for i in range(n)]
