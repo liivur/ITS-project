@@ -109,6 +109,8 @@ saved_addresses = {
 persisted_locations = []
 start_end_location = (58.364129, 26.698139)
 
+google_road_based_distance = True  # otherwise coordinate based distance
+
 
 @app.route('/')
 def index():
@@ -199,8 +201,6 @@ def api_get_path_coord_nn():
 @app.route('/path_coord_nn_dep')
 @cross_origin()
 def api_get_path_coord_nn_dep():
-    google_road_based_distance = True  # otherwise coordinate based distance
-
     if google_road_based_distance:
         road_distance_func = get_google_based_distance_func(persisted_locations, start_end_location)
         start_time = time.time()
@@ -224,17 +224,18 @@ def api_get_path_coord_nn_dep():
 @cross_origin()
 def brute_axe_method():
     # flatten
-    flattened = flatten(persisted_locations, start_end_location)
-    # locations = list()
-    # for start, end in persisted_locations:
-    #     locations.append(start)
-    #     locations.append(end)
-    # add_start_and_end(locations)
+    flattened = flatten(persisted_locations) # do not add start_end to flattened list
+    # , otherwise will be used for permutations
 
-    # TODO honor dependencies
-    start_time = time.time()
-    path, distance = bf.brute_force_axe(flattened)
-    time_taken = time.time() - start_time
+    if google_road_based_distance:
+        road_distance_func = get_google_based_distance_func(persisted_locations, start_end_location)
+        start_time = time.time()
+        path, distance = bf.brute_force_axe(flattened, persisted_locations, start_end_location, road_distance_func)
+        time_taken = time.time() - start_time
+    else:
+        start_time = time.time()
+        path, distance = bf.brute_force_axe(flattened, persisted_locations, start_end_location)
+        time_taken = time.time() - start_time
 
     print("returning distance=", distance)
     print("returning path: ", path)

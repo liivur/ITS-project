@@ -107,7 +107,8 @@ $(document).ready(function() {
 		$.ajax({
 			// url: apiUrl + 'path',
 			// url: apiUrl + 'path_coord_nn_dep',
-			url: apiUrl + 'path_google',
+			url: apiUrl + 'path_brute_axe',
+			// url: apiUrl + 'path_google',
 			type: 'GET',
 			dataType: 'json',
 			data: {
