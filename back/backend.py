@@ -7,6 +7,14 @@ import brute_force as bf
 from branch_and_bound import get_path, get_path_constrained
 import api_model
 import clustering
+import math
+
+
+def convert_to_list(pairs):
+    return_list = []
+    for p in pairs:
+        return_list.append(p)
+    return return_list
 
 
 def get_points_with_constraints(point_pairs):
@@ -83,9 +91,7 @@ def get_google_based_distance_func(locations, start_end_point):
     flattened_points = flatten(locations, start_end_point)
     # calc adj matrix for distance func
     distance_matrix = gmaps.distance_matrix(origins=flattened_points, destinations=flattened_points)
-    # print("distance_matrix: ", distance_matrix)
     adj_matrix = [list(map(lambda x: x['distance']['value'], row['elements'])) for row in distance_matrix['rows']]
-    # print("google adj matrix:", adj_matrix)
 
     def adj_based_road_distance(point1, point2):
         point1_index = flattened_points.index(point1)
@@ -139,7 +145,7 @@ def api_get_path():
     result, path = get_path_from_pairs(pairs)
     time_taken = time.time() - start_time
 
-    path_model = api_model.Path(api_model.convert_simple_path(path), result, time_taken, pairs)
+    path_model = api_model.Path(api_model.convert_simple_paths([path]), result, time_taken, pairs)
     return jsonify(path_model.get_api_dict())
 
 
@@ -167,7 +173,9 @@ def api_save_path():
 @app.route('/path_google', methods=['GET'])
 @cross_origin()
 def api_get_path_google():
-    flattened = flatten(locations=persisted_locations)
+    slot = request.args.get('slot', timeslots[0])
+    pairs = convert_to_list(saved_pairs[slot])
+    flattened = flatten(locations=pairs)
     # locations = get_flat_addresses(persisted_locations)
     # add_start_and_end(locations)
 
@@ -178,7 +186,7 @@ def api_get_path_google():
 
     path, path_distance = api_model.convert_google_directions_to_path(direction)
 
-    api_path = api_model.Path(path, path_distance, time_taken, persisted_locations)
+    api_path = api_model.Path([path], path_distance, time_taken, pairs)
 
     return jsonify(api_path.get_api_dict())
 
@@ -200,7 +208,7 @@ def api_get_path_coord_nn():
 
     print("returning distance=", distance)
 
-    api_path = api_model.Path(api_model.convert_simple_path(path), distance, time_taken, persisted_locations)
+    api_path = api_model.Path(api_model.convert_simple_paths([path]), distance, time_taken, persisted_locations)
 
     return jsonify(api_path.get_api_dict())
 
@@ -208,22 +216,34 @@ def api_get_path_coord_nn():
 @app.route('/path_coord_nn_dep')
 @cross_origin()
 def api_get_path_coord_nn_dep():
-    # clusters = 2
-    if google_road_based_distance:
-        road_distance_func = get_google_based_distance_func(persisted_locations, start_end_location)
-        start_time = time.time()
-        path, distance = nn.nearest_neighbour_dependencies(persisted_locations, road_distance_func, start_end_location)
-        time_taken = time.time() - start_time
-    else:
-        start_time = time.time()
-        path, distance = nn.nearest_neighbor_dep_coord_based(persisted_locations, start_end_location)
-        time_taken = time.time() - start_time
+    slot = request.args.get('slot', timeslots[0])
+    pairs = convert_to_list(saved_pairs[slot])
+    # max 4 pairs in a cluster
+    print("number of clusters: ", math.ceil(len(pairs) / 4.0))
+    clusters = clustering.create_clusters(pairs, math.ceil(len(pairs) / 4.0))
 
-    print("time taken: ", time_taken)
-    print("path: ", path)
-    print("distance: ", distance)
+    paths = []
+    distances = 0
+    total_time = 0
+    for cluster in clusters:
+        if google_road_based_distance:
+            road_distance_func = get_google_based_distance_func(cluster, start_end_location)
+            start_time = time.time()
+            path, distance = nn.nearest_neighbour_dependencies(cluster, road_distance_func, start_end_location)
+            time_taken = time.time() - start_time
+        else:
+            start_time = time.time()
+            path, distance = nn.nearest_neighbor_dep_coord_based(cluster, start_end_location)
+            time_taken = time.time() - start_time
+        paths.append(path)
+        distances += distance
+        total_time += time_taken
 
-    api_path = api_model.Path(api_model.convert_simple_path(path), distance, time_taken, persisted_locations)
+    print("time taken: ", total_time)
+    print("paths: ", paths)
+    print("distance: ", distances)
+
+    api_path = api_model.Path(api_model.convert_simple_paths([path]), distances, total_time, pairs)
 
     return jsonify(api_path.get_api_dict())
 
@@ -231,24 +251,26 @@ def api_get_path_coord_nn_dep():
 @app.route('/path_brute_axe')
 @cross_origin()
 def brute_axe_method():
+    slot = request.args.get('slot', timeslots[0])
+    pairs = convert_to_list(saved_pairs[slot])
     # flatten
-    flattened = flatten(persisted_locations) # do not add start_end to flattened list
+    flattened = flatten(pairs) # do not add start_end to flattened list
     # , otherwise will be used for permutations
 
     if google_road_based_distance:
-        road_distance_func = get_google_based_distance_func(persisted_locations, start_end_location)
+        road_distance_func = get_google_based_distance_func(pairs, start_end_location)
         start_time = time.time()
-        path, distance = bf.brute_force_axe(flattened, persisted_locations, start_end_location, road_distance_func)
+        path, distance = bf.brute_force_axe(flattened, pairs, start_end_location, road_distance_func)
         time_taken = time.time() - start_time
     else:
         start_time = time.time()
-        path, distance = bf.brute_force_axe(flattened, persisted_locations, start_end_location)
+        path, distance = bf.brute_force_axe(flattened, pairs, start_end_location)
         time_taken = time.time() - start_time
 
     print("returning distance=", distance)
     print("returning path: ", path)
 
-    api_path = api_model.Path(api_model.convert_simple_path(path), distance, time_taken, persisted_locations)
+    api_path = api_model.Path(api_model.convert_simple_paths([path]), distance, time_taken, pairs)
 
     return jsonify(api_path.get_api_dict())
 

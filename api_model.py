@@ -6,6 +6,13 @@ def convert_simple_path(path):
     return mapped_path
 
 
+def convert_simple_paths(paths):
+    mapped_paths = []
+    for a_path in paths:
+        mapped_paths.append(convert_simple_path(a_path))
+    return mapped_paths
+
+
 def convert_google_directions_to_path(directions):
     path_distance = 0
     path = []
@@ -20,20 +27,20 @@ def convert_google_directions_to_path(directions):
 
 
 class Path:
-    _path = []
+    _paths = []
     _distance = 0
     _time = 0
     _pairs = []
 
-    def __init__(self, path, distance, time, pairs):
-        self._path = path
+    def __init__(self, paths, distance, time, pairs):
+        self._paths = paths
         self._distance = distance
         self._time = time
         self._pairs = pairs
 
     def get_api_dict(self):
         return {
-            'paths': [self._path],
+            'paths': self._paths,
             'distance': self._distance,
             'time': self._time,
             'pairs': self._pairs,
