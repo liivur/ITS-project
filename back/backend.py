@@ -148,7 +148,7 @@ def api_save_path():
     # addresses = request.args.getlist('addresses')
     start = request.form.get('from', '')
     end = request.form.get('to', '')
-    slot = request.args.get('slot', timeslots[0])
+    slot = request.form.get('slot', timeslots[0])
     if not slot:
         slot = timeslots[0]
 
@@ -160,7 +160,7 @@ def api_save_path():
 
     saved_pairs[slot].add((start, end))
 
-    return jsonify(list(saved_pairs))
+    return jsonify(list(saved_pairs[slot]))
 
 
 @app.route('/path_google', methods=['GET'])
