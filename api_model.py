@@ -33,7 +33,7 @@ class Path:
 
     def get_api_dict(self):
         return {
-            'path': self._path,
+            'paths': [self._path],
             'distance': self._distance,
             'time': self._time,
             'pairs': self._pairs,

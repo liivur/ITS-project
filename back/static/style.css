@@ -12,9 +12,18 @@ body {
   padding: 0;
 }
 
-.input-container {
+.input-container, .data-container {
 	position: fixed;
 	top: 0;
 	right: 0;
 	padding: 10px;
+	background-color: gray;
+}
+
+.data-container {
+	top: 40px;
+}
+
+.info-container {
+	padding-top: 10px;
 }

@@ -13,9 +13,12 @@ const apiUrl = 'http://localhost:5000/';
 
 var map;
 $(document).ready(function() {
+	getAlgorithms();
+	getSlots();
 	let from = '';
 	let to = '';
 	const pairPaths = [];
+	const directionsRenderers = [];
 	
 	map = new google.maps.Map(document.getElementById('map'), {
 		zoom: 14,
@@ -33,8 +36,6 @@ $(document).ready(function() {
 
 	let geocoder = new google.maps.Geocoder();
 	let directionsService = new google.maps.DirectionsService();
-	let directionsDisplay = new google.maps.DirectionsRenderer();
-	directionsDisplay.setMap(map);
 
 	function resetFromTo() {
 		from = '';
@@ -50,29 +51,39 @@ $(document).ready(function() {
 		marker.setMap(map);
 	}
 
-	function updateMap(path, pairs) {
-		if (path.length < 2) {
-			return;
-		}
+	function updateMap(paths, pairs) {
 		while (pairPaths.length) {
 			pairPaths.pop().setMap(null);
 		}
-		const origin = path.shift().location;
-    	const destination = path.pop().location;
+		while (directionsRenderers.length) {
+			directionsRenderers.pop().setMap(null);
+		}
+		
 
-		directionsService.route({
-			destination: destination,
-			optimizeWaypoints: false,
-			origin: origin,
-			waypoints: path,
-			travelMode: google.maps.TravelMode.DRIVING,
-		}, (response, status) => {
-			if (status === 'OK') {
-				directionsDisplay.setDirections(response);
-			} else {
-				console.log('Directions request failed due to ' + status);
+    	for (var i = paths.length - 1; i >= 0; i--) {
+    		let path = paths[i];
+    		if (path.length < 2) {
+				continue;
 			}
-		});
+    		const origin = path.shift().location;
+    		const destination = path.pop().location;
+			directionsService.route({
+				destination: destination,
+				optimizeWaypoints: false,
+				origin: origin,
+				waypoints: path,
+				travelMode: google.maps.TravelMode.DRIVING,
+			}, (response, status) => {
+				if (status === 'OK') {
+					let directionsRenderer = new google.maps.DirectionsRenderer();
+					directionsRenderer.setDirections(response);
+					directionsRenderer.setMap(map);
+					directionsRenderers.push(directionsRenderer);
+				} else {
+					console.log('Directions request failed due to ' + status);
+				}
+			});
+    	}
 
 		if (pairs && pairs.length) {
 			let icons = [
@@ -103,33 +114,27 @@ $(document).ready(function() {
 		}
 	}
 	
-	function getPath(from = '', to = '') {
+	function getPaths(path, slot, from = '', to = '') {
 		$.ajax({
-			// url: apiUrl + 'path',
+			url: apiUrl + path,
 			// url: apiUrl + 'path_coord_nn_dep',
-			url: apiUrl + 'path_brute_axe',
+			// url: apiUrl + 'path_brute_axe',
 			// url: apiUrl + 'path_google',
 			type: 'GET',
 			dataType: 'json',
 			data: {
 				from: from,
 				to: to,
+				slot: slot,
 			},
 			crossDomain: true,
 		})
 		.done(function(response) {
-			// let path = response.path.map(function(elem, index) {
-			// 	return {
-			// 		location: {
-			// 			// lat: elem.coords[0],
-			// 			// lng: elem.coords[1],
-			// 			lat: elem.location.lat,
-			// 			lng: elem.location.lng,
-			// 		},
-			// 	}
-			// });
-			updateMap(response.path, response.pairs);
+			updateMap(response.paths, response.pairs);
 			console.log('success', response);
+
+			$('.js-travel-time').html(response.distance);
+			$('.js-calculation-time').html(response.time);
 		})
 		.fail(function(e) {
 			console.log('error', e);
@@ -139,7 +144,7 @@ $(document).ready(function() {
 		});
 	}
 
-	function savePath(from, to) {
+	function savePath(from, to, slot) {
 		$.ajax({
 			url: apiUrl + 'path',
 			type: 'POST',
@@ -147,6 +152,7 @@ $(document).ready(function() {
 			data: {
 				from: from,
 				to: to,
+				slot: slot,
 			},
 			crossDomain: true,
 		})
@@ -164,19 +170,21 @@ $(document).ready(function() {
 	$('.js-check-path').on('click', function(e) {
 		e.preventDefault();
 
-		getPath(from, to);
+		$slot = $('input[name="slot"]:checked');
+		$algo = $('.js-algorithm-select');
+		getPaths($algo.val(), $slot.val(), from, to);
 	});
 
 	$('.js-save-path').on('click', function(e) {
 		e.preventDefault();
 
-		savePath(from, to);
+		$button = $('input[name="slot"]:checked');
+		savePath(from, to, $button.val());
 		resetFromTo();
 	});
 
 	let isFrom = true;
-	function toggleFromTo(e) {
-		e.preventDefault();
+	function toggleFromTo() {
 		isFrom = !isFrom;
 		$button = $('.js-toggle-from-to');
 		if (isFrom) {
@@ -185,7 +193,10 @@ $(document).ready(function() {
 			$button.text('Select to');
 		}
 	}
-	$('.js-toggle-from-to').on('click', toggleFromTo);
+	$('.js-toggle-from-to').on('click', function(e) {
+		e.preventDefault();
+		toggleFromTo();
+	});
 
 	google.maps.event.addListener(map, 'click', function(event){
 		geocoder.geocode({
@@ -204,6 +215,7 @@ $(document).ready(function() {
 					setMarker(markers.to, event.latLng);
 					$('.js-address-to').val(results[0].formatted_address)
 				}
+				toggleFromTo();
 			}
 		});
 		console.log('map click', event);
@@ -211,5 +223,33 @@ $(document).ready(function() {
 
 	// points = ['Mõisavahe 2, Tartu, Estonia', 'Näituse 3, Tartu, Estonia', 'Turu 8, Tartu, Estonia', 'Riia 120, Tartu, Estonia']
 
-	
+	function getSlots() {
+		$.ajax({
+			url: apiUrl + 'slots',
+			type: 'GET',
+			dataType: 'json',
+			crossDomain: true,
+		}).done(function(response) {
+			console.log('success', response);
+			$('.data-container').html(response.map(function(item) {
+				return '<label>' + item + '<input type="radio" name="slot" value="' + item + '"></label>';
+			}).join('<br>'));
+			$('input[name="slot"]').first().prop('checked', true);
+		});
+	}
+
+	function getAlgorithms() {
+		$.ajax({
+			url: apiUrl + 'algorithms',
+			type: 'GET',
+			dataType: 'json',
+			crossDomain: true,
+		}).done(function(response) {
+			console.log('success', response);
+			$('.js-algorithm-select').html(response.map(function(item) {
+				return '<option value="' + item.path + '">' + item.name + '</option>';
+			}).join('<br>'));
+			$('.js-algorithm-select option').first().prop('selected', true);
+		});
+	}
 });
