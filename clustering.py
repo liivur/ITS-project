@@ -14,7 +14,7 @@ def create_clusters(locations, number_of_clusters=1):
             min_cluster_index1 = -1
             min_cluster_index2 = -1
             for i in range(len(clusters) - 1):
-                for j in range(i, len(clusters)):
+                for j in range(i+1, len(clusters)):
                     dist = cb.calculate_distance(clusters[i], clusters[j])
                     if dist < min_cluster_distance:
                         min_cluster_distance = dist

@@ -223,6 +223,7 @@ def api_get_path_coord_nn_dep():
 
     slot = request.args.get('slot', timeslots[0])
     pairs = convert_to_list(saved_pairs[slot])
+    print("pairs:", pairs)
     # max 4 pairs in a cluster for google distance matrix
     number_of_clusters = math.ceil(len(pairs) / 4.0)
     # number_of_clusters = 1
@@ -251,7 +252,7 @@ def api_get_path_coord_nn_dep():
     print("paths: ", paths)
     print("distance: ", distances)
 
-    api_path = api_model.Path(api_model.convert_simple_paths([path]), distances, total_time, pairs)
+    api_path = api_model.Path(api_model.convert_simple_paths(paths), distances, total_time, pairs)
 
     return jsonify(api_path.get_api_dict())
 
