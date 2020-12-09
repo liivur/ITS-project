@@ -8,6 +8,7 @@ from branch_and_bound import get_path, get_path_constrained
 import api_model
 import clustering
 import math
+import coordinate_based as cb
 
 
 def convert_to_list(pairs):
@@ -49,7 +50,7 @@ def get_path_from_pairs(pairs):
     points, constraints = get_points_with_constraints(pairs)
 
     distance_matrix = gmaps.distance_matrix(origins=points, destinations=points)
-    adj = [list(map(lambda x: x['duration']['value'], row['elements'])) for row in distance_matrix['rows']]
+    adj = [list(map(lambda x: x['distance']['value'], row['elements'])) for row in distance_matrix['rows']]
     result, path = get_path_constrained(adj, constraints)
 
     return result, map(lambda i: points[i], path)
@@ -110,7 +111,9 @@ saved_pairs = {}
 for slot in timeslots:
     saved_pairs[slot] = set()
 
-saved_pairs['10:00'].add(((58.364129, 26.698139), (58.365129, 26.698239)))
+# saved_pairs['10:00'].add(((58.364129, 26.698139), (58.365129, 26.698239)))
+saved_pairs['10:00'].add(((58.364129, 26.698139), (58.367533, 26.693740)))
+
 
 # list holds locations as latitude longitude pairs/tuples that will be used for path operations
 persisted_locations = []
@@ -216,11 +219,15 @@ def api_get_path_coord_nn():
 @app.route('/path_coord_nn_dep')
 @cross_origin()
 def api_get_path_coord_nn_dep():
+    # google_road_based_distance = False
+
     slot = request.args.get('slot', timeslots[0])
     pairs = convert_to_list(saved_pairs[slot])
-    # max 4 pairs in a cluster
-    print("number of clusters: ", math.ceil(len(pairs) / 4.0))
-    clusters = clustering.create_clusters(pairs, math.ceil(len(pairs) / 4.0))
+    # max 4 pairs in a cluster for google distance matrix
+    number_of_clusters = math.ceil(len(pairs) / 4.0)
+    # number_of_clusters = 1
+    print("number of clusters: ", number_of_clusters)
+    clusters = clustering.create_clusters(pairs, number_of_clusters)
 
     paths = []
     distances = 0
@@ -233,7 +240,8 @@ def api_get_path_coord_nn_dep():
             time_taken = time.time() - start_time
         else:
             start_time = time.time()
-            path, distance = nn.nearest_neighbor_dep_coord_based(cluster, start_end_location)
+            # path, distance = nn.nearest_neighbor_dep_coord_based(cluster, start_end_location)
+            path, distance = nn.nearest_neighbour_dependencies(cluster, cb.coordinates_distance, start_end_location)
             time_taken = time.time() - start_time
         paths.append(path)
         distances += distance
