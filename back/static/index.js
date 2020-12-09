@@ -12,13 +12,14 @@ const apiUrl = 'http://localhost:5000/';
 // }
 
 var map;
+const directionsRenderers = [];
 $(document).ready(function() {
 	getAlgorithms();
 	getSlots();
 	let from = '';
 	let to = '';
 	const pairPaths = [];
-	const directionsRenderers = [];
+	
 	
 	map = new google.maps.Map(document.getElementById('map'), {
 		zoom: 14,
@@ -59,7 +60,8 @@ $(document).ready(function() {
 			directionsRenderers.pop().setMap(null);
 		}
 		
-
+		let linecolors = ['blue', 'green', 'orange', 'yellow'];
+  		let colorIdx = 0;
     	for (var i = paths.length - 1; i >= 0; i--) {
     		let path = paths[i];
     		if (path.length < 2) {
@@ -75,10 +77,13 @@ $(document).ready(function() {
 				travelMode: google.maps.TravelMode.DRIVING,
 			}, (response, status) => {
 				if (status === 'OK') {
-					let directionsRenderer = new google.maps.DirectionsRenderer();
-					directionsRenderer.setDirections(response);
-					directionsRenderer.setMap(map);
-					directionsRenderers.push(directionsRenderer);
+					directionsRenderers.push(new google.maps.DirectionsRenderer({
+						directions: response,
+						polylineOptions: {
+							strokeColor: linecolors[colorIdx++ % 3]
+						},
+						map: map
+					}));
 				} else {
 					console.log('Directions request failed due to ' + status);
 				}

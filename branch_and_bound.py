@@ -12,10 +12,10 @@ def is_path_allowed(i, path, constraints):
 
 # Function to find the minimum edge cost
 # having an end at the vertex i
-def first_min(weights, i, maxsize=float('inf')):
+def first_min(weights, i, path, constraints, maxsize=float('inf')):
     minimum = maxsize
     for k in range(len(weights)):
-        if weights[i][k] < minimum and i != k:
+        if weights[i][k] < minimum and i != k and is_path_allowed(k, path, constraints):
             minimum = weights[i][k]
 
     return minimum
@@ -23,10 +23,10 @@ def first_min(weights, i, maxsize=float('inf')):
 
 # function to find the second minimum edge
 # cost having an end at the vertex i
-def second_min(weights, i, maxsize=float('inf')):
+def second_min(weights, i, path, constraints, maxsize=float('inf')):
     first, second = maxsize, maxsize
     for j in range(len(weights)):
-        if i == j:
+        if i == j or not is_path_allowed(j, path, constraints):
             continue
         if weights[i][j] <= first:
             second = first
@@ -61,9 +61,9 @@ def get_path_rec(weights, lower_bound, weight, level, path, visited, constraints
         # different computation of curr_bound
         # for level 2 from the other levels
         if level == 1:
-            item_bound = (first_min(weights, path[level - 1]) + first_min(weights, i)) / 2
+            item_bound = (first_min(weights, path[level - 1], path, constraints) + first_min(weights, i, path, constraints)) / 2
         else:
-            item_bound = (second_min(weights, path[level - 1]) + first_min(weights, i)) / 2
+            item_bound = (second_min(weights, path[level - 1], path, constraints) + first_min(weights, i, path, constraints)) / 2
 
         t_bound = lower_bound - item_bound
         # t_bound + current_weight is the actual lower bound for the node that we have arrived on.
@@ -141,8 +141,10 @@ def get_path_constrained(weights, from_to=[]):
     # using the formula 1/2 * (sum of first min +
     # second min) for all edges.
     bound = 0
+    temp_path = [-1] * (n + 1)
     for i in range(n):
-        bound += first_min(weights, i) + second_min(weights, i)
+        bound += first_min(weights, i, temp_path, constraints) + second_min(weights, i, temp_path, constraints)
+        temp_path[i] = i
     bound = math.ceil(bound / 2)
 
     # Call to get_path_rec for curr_weight
