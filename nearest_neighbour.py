@@ -75,7 +75,11 @@ def nearest_neighbour_dependencies(locations, distance_func=cb.coordinates_dista
     """Nearest neighbour path search. Takes into account dependencies between starting and ending points.
     Select first element's start point and add to path. Now find minimal distances between the lastly added point and
     all starting points plus ending points that are already in path. If start is given then add this point to the
-    start and end of path."""
+    start and end of path.
+    locations - list of pairs of points representing start and end point, (((start_point1_lat, start_point1_lng), (end_point1_lat, end_point1_lng)), ...)
+    distance_func - function for distance calculation, by default uses coordinate based
+    start_point - optional starting point that is set as first and last point in path
+    returns tuple of path and it's distance"""
     path = []
     overall_distance = 0
     if start_point is not None:
@@ -84,15 +88,24 @@ def nearest_neighbour_dependencies(locations, distance_func=cb.coordinates_dista
     if len(locations) > 0:
         locs = locations.copy()
         # path = locs[0][0] # start of first tuple
+
+        # if start point is not given then add first point(from first tuple) of locations and start with that
+        if start_point is None:
+            path.append(locs[0][0])
+            current_point = locs[0][0]
+            locs[0] = (None, locs[0][1])
+        else:
+            current_point = start_point
+
         while len(locs) > 0:
 
             # if start point is not given then add first point(from first tuple) of locations and start with that
-            if start_point is None:
-                path.append(locs[0][0])
-                current_point = locs[0][0]
-                locs[0] = (None, locs[0][1])
-            else:
-                current_point = start_point
+            # if start_point is None:
+            #     path.append(locs[0][0])
+            #     current_point = locs[0][0]
+            #     locs[0] = (None, locs[0][1])
+            # else:
+            #     current_point = start_point
 
             min_distance = float('inf')
             closest_point_index = -1
@@ -120,19 +133,17 @@ def nearest_neighbour_dependencies(locations, distance_func=cb.coordinates_dista
             path.append(new_point)
             overall_distance += min_distance
 
+            current_point = new_point
+
         # add starting point to the end also
-        distance = distance_func(path[-1], start_point)
-        path.append(start_point)
-        overall_distance += distance
+        if start_point is not None:
+            distance = distance_func(path[-1], start_point)
+            path.append(start_point)
+            overall_distance += distance
 
     return path, overall_distance
 
 
-def nearest_neighbour_multiple(locations, distance_func=cb.coordinates_distance, start_point=None, number_of_buses=1):
-    if number_of_buses > 1:
-
-
-
-
-        sorted_centroids = sorted(centroids, key=lambda x: x[0])
-
+if __name__ == "__main__":
+    # test nn
+    nearest_neighbour_dependencies(locations, distance_func=cb.coordinates_distance)

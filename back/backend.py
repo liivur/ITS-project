@@ -49,9 +49,15 @@ def get_path_from_pairs(pairs):
 
     points, constraints = get_points_with_constraints(pairs)
 
-    distance_matrix = gmaps.distance_matrix(origins=points, destinations=points)
-    adj = [list(map(lambda x: x['distance']['value'], row['elements'])) for row in distance_matrix['rows']]
-    result, path = get_path_constrained(adj, constraints)
+    # temporarily coordinate based
+    # distance_matrix = gmaps.distance_matrix(origins=points, destinations=points)
+    # adj = [list(map(lambda x: x['distance']['value'], row['elements'])) for row in distance_matrix['rows']]
+    # print("pairs: ", pairs)
+    # print("adj: ", adj)
+    adj1 = cb.calc_coord_distances(flatten(convert_to_list(pairs)))
+    # print("adj1: ", adj1)
+
+    result, path = get_path_constrained(adj1, constraints)
 
     return result, map(lambda i: points[i], path)
 
@@ -119,7 +125,7 @@ saved_pairs['10:00'].add(((58.364129, 26.698139), (58.367533, 26.693740)))
 persisted_locations = []
 start_end_location = (58.364129, 26.698139)
 
-google_road_based_distance = True  # otherwise coordinate based distance
+google_road_based_distance = False  # otherwise coordinate based distance
 
 
 @app.route('/')
@@ -226,6 +232,7 @@ def api_get_path_coord_nn_dep():
     print("pairs:", pairs)
     # max 4 pairs in a cluster for google distance matrix
     number_of_clusters = math.ceil(len(pairs) / 4.0)
+
     # number_of_clusters = 1
     print("number of clusters: ", number_of_clusters)
     clusters = clustering.create_clusters(pairs, number_of_clusters)
@@ -234,16 +241,15 @@ def api_get_path_coord_nn_dep():
     distances = 0
     total_time = 0
     for cluster in clusters:
+        distance_func = cb.coordinates_distance
         if google_road_based_distance:
-            road_distance_func = get_google_based_distance_func(cluster, start_end_location)
-            start_time = time.time()
-            path, distance = nn.nearest_neighbour_dependencies(cluster, road_distance_func, start_end_location)
-            time_taken = time.time() - start_time
-        else:
-            start_time = time.time()
-            # path, distance = nn.nearest_neighbor_dep_coord_based(cluster, start_end_location)
-            path, distance = nn.nearest_neighbour_dependencies(cluster, cb.coordinates_distance, start_end_location)
-            time_taken = time.time() - start_time
+            distance_func = get_google_based_distance_func(cluster, start_end_location)
+
+        start_time = time.time()
+        #path, distance = nn.nearest_neighbour_dependencies(cluster, distance_func, start_end_location)
+        path, distance = nn.nearest_neighbour_dependencies(cluster, distance_func)
+        time_taken = time.time() - start_time
+
         paths.append(path)
         distances += distance
         total_time += time_taken
@@ -266,15 +272,14 @@ def brute_axe_method():
     flattened = flatten(pairs) # do not add start_end to flattened list
     # , otherwise will be used for permutations
 
+    distance_func = cb.coordinates_distance
+
     if google_road_based_distance:
-        road_distance_func = get_google_based_distance_func(pairs, start_end_location)
-        start_time = time.time()
-        path, distance = bf.brute_force_axe(flattened, pairs, start_end_location, road_distance_func)
-        time_taken = time.time() - start_time
-    else:
-        start_time = time.time()
-        path, distance = bf.brute_force_axe(flattened, pairs, start_end_location)
-        time_taken = time.time() - start_time
+        distance_func = get_google_based_distance_func(pairs, start_end_location)
+
+    start_time = time.time()
+    path, distance = bf.brute_force_axe(flattened, pairs, start_end_location, distance_func)
+    time_taken = time.time() - start_time
 
     print("returning distance=", distance)
     print("returning path: ", path)

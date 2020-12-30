@@ -3,7 +3,7 @@ import coordinate_based as cb
 path_counter = 0
 
 
-def brute_force_axe(flat_locations, locations, start_end, distance_func=cb.coordinates_distance):
+def brute_force_axe(flat_locations, locations, start_end=None, distance_func=cb.coordinates_distance):
     """Single bus brute force method, calculates and measures distance of every permutation.
     Takes into account also dependencies."""
     if start_end is not None:
@@ -13,7 +13,7 @@ def brute_force_axe(flat_locations, locations, start_end, distance_func=cb.coord
     return brute_force_rec(path, flat_locations, locations, start_end, distance_func=distance_func)
 
 
-def brute_force_rec(path, flat_locations, locations, start_end, distance_func=cb.coordinates_distance):
+def brute_force_rec(path, flat_locations, locations, start_end=None, distance_func=cb.coordinates_distance):
     """Single bus brute force method(recursive), calculates and measures distance of every permutation.
         Takes into account dependencies also."""
     global path_counter
@@ -36,6 +36,8 @@ def brute_force_rec(path, flat_locations, locations, start_end, distance_func=cb
         if distance < min_distance:
             min_distance = distance
             min_path = found_path
+        if len(path) == 0:
+            print(i, " iteration done")
     return min_path, min_distance
 
 

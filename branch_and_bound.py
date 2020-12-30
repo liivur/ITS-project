@@ -44,9 +44,9 @@ def get_path_rec(weights, lower_bound, weight, level, path, visited, constraints
     # which means we have covered all the nodes once
     if level == n:
         # current_result has the total weight of the solution we got
-        current_result = weight + weights[path[level - 1]][path[0]]
+        current_result = weight #+ weights[path[level - 1]][path[0]]
         final_path = path[:]
-        final_path[n] = path[0]
+        #final_path[n] = path[0]
 
         return current_result, final_path
 
@@ -102,7 +102,8 @@ def get_path(weights):
     bound = math.ceil(bound / 2)
 
     # Initialize the current_path and visited array
-    path = [-1] * (n + 1)
+    # path = [-1] * (n + 1)
+    path = [-1] * n
     visited = [False] * n
 
     # We start at vertex 1 so the first vertex
@@ -129,7 +130,8 @@ def get_path_constrained(weights, from_to=[]):
         constraints[pair[1]].append(pair[0])
 
     # Initialize the current_path and visited array
-    path = [-1] * (n + 1)
+    # path = [-1] * (n + 1)
+    path = [-1] * n
     visited = [False] * n
 
     # We start at vertex 1 so the first vertex
@@ -141,7 +143,8 @@ def get_path_constrained(weights, from_to=[]):
     # using the formula 1/2 * (sum of first min +
     # second min) for all edges.
     bound = 0
-    temp_path = [-1] * (n + 1)
+    # temp_path = [-1] * (n + 1)
+    temp_path = [-1] * n
     for i in range(n):
         bound += first_min(weights, i, temp_path, constraints) + second_min(weights, i, temp_path, constraints)
         temp_path[i] = i
