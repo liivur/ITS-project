@@ -81,10 +81,10 @@ if __name__ == "__main__":
     #                        ]
 
     print("locations: ", persisted_locations)
-    # test_nn(persisted_locations)
-    #
-    # flattened = nn.flatten(persisted_locations)
-    #
-    # test_bf(flattened, persisted_locations)
+    test_nn(persisted_locations)
+
+    flattened = nn.flatten(persisted_locations)
+
+    test_bf(flattened, persisted_locations)
 
     test_bb(persisted_locations)
